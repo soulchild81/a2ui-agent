@@ -3,9 +3,9 @@ import logging
 from collections.abc import AsyncIterator
 from dataclasses import asdict
 from time import perf_counter
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from app.a2ui.controller.dependencies import get_generation_service
@@ -13,6 +13,7 @@ from app.a2ui.controller.request import A2uiActionRequest, GenerateA2uiRequest
 from app.a2ui.controller.response import ActionResponse
 from app.a2ui.domain import A2uiAction, GenerationRequest
 from app.a2ui.service import A2uiGenerationService
+from app.a2ui.service.catalog_service import CatalogService
 from app.common.config import get_settings
 from app.common.error import ApplicationError
 
@@ -23,6 +24,13 @@ router = APIRouter(prefix="/api/v1/a2ui", tags=["a2ui"])
 
 def _sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+@router.get("/catalogs/{profile}")
+async def get_catalog(
+    profile: Literal["cadenza", "basic"],
+) -> dict:
+    return CatalogService(profile).catalog.to_json()
 
 
 @router.post("/stream", response_class=StreamingResponse)
@@ -66,8 +74,14 @@ async def stream_a2ui(
 @router.post("/actions", response_model=ActionResponse)
 async def handle_action(
     body: A2uiActionRequest,
+    request: Request,
     service: Annotated[A2uiGenerationService, Depends(get_generation_service)],
 ) -> ActionResponse:
+    action_payload = await request.json()
+    logger.info(
+        "A2UI action request payload=%s",
+        json.dumps(action_payload, ensure_ascii=False, separators=(",", ":")),
+    )
     messages = service.handle_action(
         A2uiAction(
             name=body.name,

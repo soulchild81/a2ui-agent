@@ -1,7 +1,15 @@
 import json
+import logging
 
+import pytest
+from a2ui.core import A2uiError
 from fastapi.testclient import TestClient
 
+from app.a2ui.catalog import (
+    CADENZA_CATALOG_ID,
+    CADENZA_CUSTOM_COMPONENT_NAMES,
+    CADENZA_RENDERER_BY_COMPONENT,
+)
 from app.a2ui.controller.dependencies import get_generation_service
 from app.a2ui.service import A2uiGenerationService
 from app.a2ui.service.catalog_service import CatalogService
@@ -28,6 +36,19 @@ def test_health() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "mode": "mock", "protocol_version": "v0.9"}
+
+
+def test_cadenza_catalog_schema_endpoint_exposes_all_components() -> None:
+    response = client.get("/api/v1/a2ui/catalogs/cadenza")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["catalogId"] == CADENZA_CATALOG_ID
+    assert len(body["components"]) == 65
+    assert body["components"]["Alert"]["allOf"][1]["required"] == [
+        "component",
+        "title",
+    ]
 
 
 def test_stream_returns_valid_a2ui_sequence() -> None:
@@ -91,6 +112,30 @@ def test_action_updates_surface_data_model() -> None:
     assert "SoundFit Air" in update["value"]
 
 
+def test_action_logs_received_json(caplog) -> None:
+    # Given
+    payload = {
+        "name": "select_product",
+        "surfaceId": "recommendation-surface",
+        "sourceComponentId": "button-0",
+        "context": {
+            "productName": "SoundFit Air",
+            "metadata": {"category": "audio", "rank": 1},
+        },
+    }
+    expected_log = (
+        "A2UI action request payload="
+        + json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    )
+
+    # When
+    with caplog.at_level(logging.INFO, logger="app.a2ui.controller.router"):
+        response = client.post("/api/v1/a2ui/actions", json=payload)
+
+    # Then
+    assert response.status_code == 200 and expected_log in caplog.messages
+
+
 def test_llm_mode_reports_configuration_error_as_sse() -> None:
     settings = Settings(
         _env_file=None,
@@ -139,19 +184,60 @@ def test_stream_rejects_unknown_renderer_catalog() -> None:
 
 def test_catalog_allows_only_composer_mapped_components() -> None:
     catalog_service = CatalogService()
+    basic_catalog = CatalogService("basic").catalog
 
-    assert set(catalog_service.catalog.components) == {
-        "Text",
-        "Row",
-        "Column",
-        "Card",
-        "Button",
-    }
+    assert catalog_service.catalog_id == CADENZA_CATALOG_ID
+    assert set(catalog_service.catalog.components) == (
+        set(basic_catalog.components) | set(CADENZA_CUSTOM_COMPONENT_NAMES)
+    )
+    assert len(catalog_service.catalog.components) == 65
 
 
-def test_basic_catalog_exposes_more_components_than_cadenza_profile() -> None:
+def test_cadenza_profile_extends_every_basic_catalog_component() -> None:
     cadenza_catalog = CatalogService("cadenza").catalog
     basic_catalog = CatalogService("basic").catalog
 
-    assert len(basic_catalog.components) > len(cadenza_catalog.components)
+    assert set(basic_catalog.components) < set(cadenza_catalog.components)
+    assert len(CADENZA_RENDERER_BY_COMPONENT) == 47
+    assert len(set(CADENZA_RENDERER_BY_COMPONENT.values())) == 47
+
+
+def test_cadenza_custom_component_schema_validates_required_properties() -> None:
+    catalog_service = CatalogService("cadenza")
+    valid_messages = [
+        {
+            "version": "v0.9",
+            "createSurface": {
+                "surfaceId": "custom-surface",
+                "catalogId": catalog_service.catalog_id,
+            },
+        },
+        {
+            "version": "v0.9",
+            "updateComponents": {
+                "surfaceId": "custom-surface",
+                "components": [
+                    {
+                        "id": "root",
+                        "component": "Alert",
+                        "title": "저장이 완료되었습니다.",
+                        "tone": "success",
+                    }
+                ],
+            },
+        },
+    ]
+
+    catalog_service.validate(valid_messages)
+
+    invalid_messages = [*valid_messages]
+    invalid_messages[1] = {
+        "version": "v0.9",
+        "updateComponents": {
+            "surfaceId": "custom-surface",
+            "components": [{"id": "root", "component": "Alert"}],
+        },
+    }
+    with pytest.raises(A2uiError):
+        catalog_service.validate(invalid_messages)
 

@@ -5,7 +5,7 @@
 ## 주요 기능
 
 - `a2ui-agent-sdk` 기반 Catalog 프롬프트 생성
-- A2UI Basic Catalog 및 Cadenza 제한 Catalog 지원
+- A2UI Basic Catalog 및 전체 18개 표준 타입의 Cadenza Composer Renderer 지원
 - Gemini OpenAI 호환 API와 Local Codex CLI 선택 지원
 - `<a2ui-json>` 응답 파싱 및 Catalog 스키마 검증
 - 잘못된 LLM 응답 재시도
@@ -161,10 +161,28 @@ Content-Type: application/json
 
 | 프로필 | 허용 범위 |
 |---|---|
-| `cadenza` | `Text`, `Row`, `Column`, `Card`, `Button` |
+| `cadenza` | 표준 18개와 Composer 전용 47개를 합친 65개 타입을 JSON Schema로 제한·검증 |
 | `basic` | A2UI Basic Catalog 전체 |
 
 Agent는 클라이언트가 전달한 Renderer Capabilities와 선택된 Catalog ID가 일치하는지 확인합니다. LLM이 미등록 컴포넌트를 반환하면 검증 단계에서 차단합니다.
+
+### Cadenza Custom Schema 구성
+
+`app/a2ui/catalog/cadenza.py`가 Cadenza Catalog의 단일 Agent 계약입니다.
+
+- 공식 Basic Catalog 문서에 47개 Composer 전용 컴포넌트 스키마를 추가합니다.
+- 최종 Catalog ID는 `https://okestro.dev/a2ui/catalogs/cadenza-composer-v0.9.json`입니다.
+- 컨테이너, 오버레이, 데이터, 입력, 진행 상태 등 역할별로 필수 속성을 검증합니다.
+- `ComponentId`, `ChildList`, `Action`, `ComponentCommon`은 A2UI v0.9 공통 타입을 참조합니다.
+- SDK가 확장된 Catalog Schema를 LLM 시스템 프롬프트에 포함하고, 동일한 Schema로 LLM 응답을 다시 검증합니다.
+
+따라서 Custom 타입은 단순 CSS 클래스 문자열이 아니라 Agent JSON Schema와 Client Renderer 양쪽에 모두 등록되어야 사용할 수 있습니다.
+
+생성된 Catalog JSON 문서는 다음 API로 직접 확인할 수 있습니다.
+
+```bash
+curl http://127.0.0.1:8000/api/v1/a2ui/catalogs/cadenza
+```
 
 ## 프로젝트 구조
 
@@ -172,6 +190,7 @@ Agent는 클라이언트가 전달한 Renderer Capabilities와 선택된 Catalog
 app/
 ├── a2ui/
 │   ├── controller/     # REST/SSE API
+│   ├── catalog/        # Cadenza Custom Catalog와 JSON Schema 생성
 │   ├── domain/         # 요청, 결과, 액션 모델
 │   └── service/        # Catalog, Generator, 검증
 ├── common/

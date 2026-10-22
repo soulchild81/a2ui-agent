@@ -6,13 +6,13 @@ from a2ui.parser import A2uiPart
 from a2ui.processor import A2uiRequestProcessor
 from a2ui.utils import validate_payload
 
+from app.a2ui.catalog import create_cadenza_catalog
 from app.a2ui.domain import A2uiMessage, CatalogProfile
 from app.common.error import ApplicationError
 
 
 class CatalogService:
     protocol_version = "0.9"
-    allowed_components = ("Text", "Row", "Column", "Card", "Button")
 
     def __init__(self, profile: CatalogProfile = "cadenza") -> None:
         self.profile = profile
@@ -22,10 +22,7 @@ class CatalogService:
         basic_catalog = BasicCatalog(self.protocol_version, locale="ko-KR")
         if self.profile == "basic":
             return basic_catalog
-        components = [
-            basic_catalog.components[name] for name in self.allowed_components
-        ]
-        return basic_catalog.copy_with(components=components)
+        return create_cadenza_catalog()
 
     @cached_property
     def processor(self) -> A2uiRequestProcessor:

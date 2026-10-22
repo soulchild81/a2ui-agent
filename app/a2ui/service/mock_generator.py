@@ -43,7 +43,10 @@ class MockA2uiGenerator:
                 "version": "v0.9",
                 "updateComponents": {
                     "surfaceId": surface_id,
-                    "components": self._components(request.query),
+                    "components": self._components(
+                        request.query,
+                        self._catalog_service.profile,
+                    ),
                 },
             },
             {
@@ -92,7 +95,7 @@ class MockA2uiGenerator:
         )
 
     @staticmethod
-    def _components(query: str) -> list[dict]:
+    def _components(query: str, catalog_profile: str) -> list[dict]:
         components: list[dict] = [
             {
                 "id": "root",
@@ -177,5 +180,43 @@ class MockA2uiGenerator:
                 "variant": "caption",
             }
         )
+        if catalog_profile == "cadenza":
+            components[0]["children"].extend(
+                ["custom-alert", "custom-table", "custom-progress", "custom-tag"]
+            )
+            components.extend(
+                [
+                    {
+                        "id": "custom-alert",
+                        "component": "Alert",
+                        "title": "Cadenza Custom Catalog 적용",
+                        "description": "Composer 전용 컴포넌트가 JSON Schema로 검증되었습니다.",
+                        "tone": "success",
+                    },
+                    {
+                        "id": "custom-table",
+                        "component": "Table",
+                        "title": "Catalog 구성",
+                        "columns": ["구분", "개수"],
+                        "rows": [
+                            {"구분": "A2UI 표준", "개수": 18},
+                            {"구분": "Cadenza Custom", "개수": 47},
+                        ],
+                    },
+                    {
+                        "id": "custom-progress",
+                        "component": "Progress",
+                        "label": "Composer data-comp 커버리지",
+                        "value": 64,
+                        "max": 64,
+                    },
+                    {
+                        "id": "custom-tag",
+                        "component": "StatusTag",
+                        "text": "64개 계약 등록 완료",
+                        "tone": "green",
+                    },
+                ]
+            )
         return components
 
