@@ -7,10 +7,13 @@ from fastapi.testclient import TestClient
 
 from app.a2ui.catalog import (
     CADENZA_CATALOG_ID,
+    CADENZA_COMPOSER_DATA_COMPS,
     CADENZA_CUSTOM_COMPONENT_NAMES,
+    CADENZA_DESIGN_SYSTEM_VERSION,
     CADENZA_RENDERER_BY_COMPONENT,
 )
 from app.a2ui.controller.dependencies import get_generation_service
+from app.a2ui.controller.request import MAX_QUERY_LENGTH
 from app.a2ui.service import A2uiGenerationService
 from app.a2ui.service.catalog_service import CatalogService
 from app.common.config import Settings
@@ -44,11 +47,26 @@ def test_cadenza_catalog_schema_endpoint_exposes_all_components() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["catalogId"] == CADENZA_CATALOG_ID
+    assert CADENZA_DESIGN_SYSTEM_VERSION in body["title"]
     assert len(body["components"]) == 65
     assert body["components"]["Alert"]["allOf"][1]["required"] == [
         "component",
         "title",
     ]
+    dynamic_string_ref = {
+        "$ref": (
+            "https://a2ui.org/specification/v0_9/"
+            "common_types.json#/$defs/DynamicString"
+        )
+    }
+    assert (
+        body["components"]["Select"]["allOf"][1]["properties"]["value"]
+        == dynamic_string_ref
+    )
+    assert (
+        body["components"]["Segmented"]["allOf"][1]["properties"]["value"]
+        == dynamic_string_ref
+    )
 
 
 def test_stream_returns_valid_a2ui_sequence() -> None:
@@ -64,6 +82,20 @@ def test_stream_returns_valid_a2ui_sequence() -> None:
     assert messages[0]["createSurface"]["surfaceId"] == "recommendation-surface"
     assert messages[1]["updateComponents"]["components"][0]["id"] == "root"
     assert messages[2]["updateDataModel"]["value"]["products"][0]["price"] == "79,000원"
+
+
+def test_stream_accepts_large_prompt_up_to_configured_limit() -> None:
+    accepted = client.post(
+        "/api/v1/a2ui/stream",
+        json={"query": "가" * MAX_QUERY_LENGTH, "mode": "mock"},
+    )
+    rejected = client.post(
+        "/api/v1/a2ui/stream",
+        json={"query": "가" * (MAX_QUERY_LENGTH + 1), "mode": "mock"},
+    )
+
+    assert accepted.status_code == 200
+    assert rejected.status_code == 422
 
 
 def test_stream_returns_agent_generation_timing() -> None:
@@ -200,6 +232,8 @@ def test_cadenza_profile_extends_every_basic_catalog_component() -> None:
     assert set(basic_catalog.components) < set(cadenza_catalog.components)
     assert len(CADENZA_RENDERER_BY_COMPONENT) == 47
     assert len(set(CADENZA_RENDERER_BY_COMPONENT.values())) == 47
+    assert len(CADENZA_COMPOSER_DATA_COMPS) == 64
+    assert len(set(CADENZA_COMPOSER_DATA_COMPS)) == 64
 
 
 def test_cadenza_custom_component_schema_validates_required_properties() -> None:

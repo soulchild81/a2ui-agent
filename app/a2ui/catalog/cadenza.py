@@ -5,8 +5,10 @@ from typing import Any, Literal
 from a2ui.core.basic_catalog import BasicCatalog
 from a2ui.core.catalog import Catalog
 
+CADENZA_DESIGN_SYSTEM_VERSION = "2.0.9"
 CADENZA_CATALOG_ID = (
-    "https://okestro.dev/a2ui/catalogs/cadenza-composer-v0.9.json"
+    "https://okestro.dev/a2ui/catalogs/"
+    f"cadenza-composer-v{CADENZA_DESIGN_SYSTEM_VERSION}-a2ui-v0.9.json"
 )
 COMMON_TYPES = "https://a2ui.org/specification/v0_9/common_types.json#/$defs/"
 
@@ -103,6 +105,31 @@ CADENZA_CUSTOM_COMPONENT_NAMES = tuple(
 CADENZA_RENDERER_BY_COMPONENT = {
     spec.name: spec.data_comp for spec in CADENZA_CUSTOM_COMPONENT_SPECS
 }
+
+# data-comp contracts published by Cadenza Composer 2.0.9 and rendered through
+# the A2UI Basic Catalog adapters in the web application.
+CADENZA_BASIC_DATA_COMPS = (
+    "base-button",
+    "base-flex",
+    "base-modal-layout",
+    "basic-ellipsis-text",
+    "basic-info-list",
+    "basic-title",
+    "card",
+    "checkbox",
+    "date-range-picker",
+    "divider",
+    "group-tag",
+    "icon",
+    "input",
+    "radio",
+    "slider",
+    "tab-list",
+    "textarea",
+)
+CADENZA_COMPOSER_DATA_COMPS = tuple(
+    sorted((*CADENZA_BASIC_DATA_COMPS, *CADENZA_RENDERER_BY_COMPONENT.values()))
+)
 
 
 def _ref(name: str) -> dict[str, str]:
@@ -272,7 +299,7 @@ def _properties_for(kind: ComponentKind) -> tuple[dict[str, Any], list[str]]:
         return {
             "label": {"type": "string"},
             "options": _array(_option_schema(), min_items=1),
-            "value": {"type": "string"},
+            "value": _ref("DynamicString"),
             "action": _ref("Action"),
         }, ["options"]
     if kind == "number":
@@ -344,9 +371,12 @@ def create_cadenza_catalog(locale: str = "ko-KR"):
     basic_catalog = BasicCatalog("0.9", locale=locale)
     document = deepcopy(basic_catalog.to_json())
     document["catalogId"] = CADENZA_CATALOG_ID
-    document["title"] = "Cadenza Composer Catalog"
+    document["title"] = (
+        f"Cadenza Composer {CADENZA_DESIGN_SYSTEM_VERSION} Catalog"
+    )
     document["description"] = (
-        "A2UI v0.9 Basic components and Cadenza Composer custom components."
+        "A2UI v0.9 Basic components and Cadenza Composer "
+        f"{CADENZA_DESIGN_SYSTEM_VERSION} custom components."
     )
     document["instructions"] = (
         "Use standard A2UI components for common content and controls. "

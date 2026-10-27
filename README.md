@@ -171,7 +171,8 @@ Agent는 클라이언트가 전달한 Renderer Capabilities와 선택된 Catalog
 `app/a2ui/catalog/cadenza.py`가 Cadenza Catalog의 단일 Agent 계약입니다.
 
 - 공식 Basic Catalog 문서에 47개 Composer 전용 컴포넌트 스키마를 추가합니다.
-- 최종 Catalog ID는 `https://okestro.dev/a2ui/catalogs/cadenza-composer-v0.9.json`입니다.
+- 최종 Catalog ID는 `https://okestro.dev/a2ui/catalogs/cadenza-composer-v2.0.9-a2ui-v0.9.json`입니다.
+- Cadenza Composer 2.0.9의 64개 `data-comp` 계약(표준 매핑 17개, Custom 47개)을 추적합니다.
 - 컨테이너, 오버레이, 데이터, 입력, 진행 상태 등 역할별로 필수 속성을 검증합니다.
 - `ComponentId`, `ChildList`, `Action`, `ComponentCommon`은 A2UI v0.9 공통 타입을 참조합니다.
 - SDK가 확장된 Catalog Schema를 LLM 시스템 프롬프트에 포함하고, 동일한 Schema로 LLM 응답을 다시 검증합니다.
